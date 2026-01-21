@@ -1,0 +1,74 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: yt_session_db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-ytsession}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ytsession123}
+      POSTGRES_DB: ${POSTGRES_DB:-ytsession}
+    volumes:
+      - /volume2/docker/YoutubeDownloader/postgres:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ytsession}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: yt_session_backend
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-ytsession}:${POSTGRES_PASSWORD:-ytsession123}@postgres:5432/${POSTGRES_DB:-ytsession}
+      PORT: ${BACKEND_PORT:-3000}
+      NODE_ENV: ${NODE_ENV:-production}
+      # AI Configuration (mock by default)
+      AI_MODEL: ${AI_MODEL:-gpt-3.5-turbo}
+      AI_API_KEY: ${AI_API_KEY:-mock-key}
+    ports:
+      - "0.0.0.0:${BACKEND_PORT:-3000}:3000"
+    volumes:
+      # Mount for downloaded files (subtitles and videos)
+      - /volume2/docker/YoutubeDownloader/downloads:/tmp
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: yt_session_frontend
+    environment:
+      # Leave empty to use relative URLs through reverse proxy
+      VITE_API_URL: ${API_URL:-}
+      VITE_APP_NAME: ${APP_NAME:-YT Insight}
+    ports:
+      - "0.0.0.0:${FRONTEND_PORT:-5173}:5173"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    driver: local
+  yt_downloads:
+    driver: local
+
+networks:
+  default:
+    name: yt_session_network
