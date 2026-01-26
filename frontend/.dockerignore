@@ -1,0 +1,34 @@
+# Node modules
+node_modules/
+npm-debug.log
+
+# Development files
+*.md
+.git/
+.gitignore
+.env
+.env.*
+
+# Build outputs
+dist/
+build/
+
+# Synology NAS directories
+@eaDir/
+**/@eaDir/
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Testing
+coverage/
+*.test.ts
+*.test.tsx
+*.spec.ts
+*.spec.tsx
+
+# Logs
+*.log

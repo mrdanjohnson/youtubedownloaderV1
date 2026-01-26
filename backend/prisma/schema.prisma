@@ -1,0 +1,51 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Session {
+  id              String   @id @default(uuid())
+  youtube_url     String
+  video_title     String?  @db.Text
+  srt_text        String?  @db.Text
+  video_file_path String?  @db.Text
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  // Stored as JSONB: [{ prompt: string, response: string, model: string, timestamp: string }]
+  ai_results   Json     @default("[]")
+
+  // Stored as JSONB: { model: string, maxTokens: number, temperature: number }
+  app_settings Json     @default("{}")
+
+  @@map("sessions")
+}
+
+model Prompt {
+  id          String   @id @default(uuid())
+  name        String
+  description String
+  prompt      String   @db.Text
+  is_default  Boolean  @default(false)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  @@map("prompts")
+}
+
+model AppSetting {
+  id         String   @id @default(uuid())
+  key        String   @unique
+  value      String   @db.Text
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@map("app_settings")
+}
