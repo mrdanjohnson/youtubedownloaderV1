@@ -1,0 +1,77 @@
+# YouTube Downloader V1 - CasaOS Docker Compose
+# Optimized for CasaOS deployment with local paths
+
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: youtubedownloader-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-ytsession}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ytsession123}
+      POSTGRES_DB: ${POSTGRES_DB:-ytsession}
+    volumes:
+      - ytdl_postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5434:5432"  # Using 5434 to avoid conflict with secondbrainv1 on 5433
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ytsession}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  backend:
+    build:
+      context: /DATA/Apps/youtubedownloader/backend
+      dockerfile: Dockerfile
+    container_name: youtubedownloader-backend
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-ytsession}:${POSTGRES_PASSWORD:-ytsession123}@postgres:5432/${POSTGRES_DB:-ytsession}
+      PORT: ${BACKEND_PORT:-3000}
+      NODE_ENV: ${NODE_ENV:-production}
+      AI_MODEL: ${AI_MODEL:-gpt-4o-mini}
+      AI_API_KEY: ${AI_API_KEY}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+    ports:
+      - "3002:3000"  # Using 3002 to avoid conflict with secondbrainv1 on 3101
+    volumes:
+      - /DATA/AppData/youtubedownloader/downloads:/tmp
+      - /DATA/AppData/youtubedownloader/config:/app/config
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
+
+  frontend:
+    build:
+      context: /DATA/Apps/youtubedownloader/frontend
+      dockerfile: Dockerfile
+    container_name: youtubedownloader-frontend
+    environment:
+      VITE_API_URL: ${API_URL:-http://192.168.1.91:3002}
+      VITE_APP_NAME: ${APP_NAME:-YT Insight}
+    ports:
+      - "5174:5173"  # Using 5174 to avoid conflicts
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  ytdl_postgres_data:
+    driver: local
+
+networks:
+  default:
+    name: youtubedownloader-network
